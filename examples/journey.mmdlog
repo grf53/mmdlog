@@ -1,0 +1,7 @@
+@diagram journey
+!+title mmdlog Adoption
+!+section Discover
++Search docs : 4 : User
++Read examples : 3 : User
+!+section Adopt
++Integrate SDK : 5 : User, Team

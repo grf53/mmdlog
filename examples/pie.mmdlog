@@ -1,0 +1,5 @@
+@diagram pie
+!+title Deployment Share
++"API" : 45
++"Worker" : 30
++"DB" : 25

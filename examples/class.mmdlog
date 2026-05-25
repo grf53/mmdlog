@@ -1,0 +1,33 @@
+@diagram class
+
++class User
+!+member User -string id
++member User -string email
++member User -int age
++member User +login(password) bool
+!+member User +logout() void
+
++class Order
+!+member Order -string id
++member Order -string userId
++member Order -float total
++member Order +addItem(name, price) void
++member Order +submit() bool
+
++User "1" --o "*" Order : places
+
++class PaymentGateway
++member PaymentGateway +charge(amount) bool
+!+member PaymentGateway +refund(txId) bool
+
++class StripeGateway
+!+member StripeGateway -string apiKey
++member StripeGateway +charge(amount) bool
+!+member StripeGateway +refund(txId) bool
+
++StripeGateway --|> PaymentGateway : implements
++Order ..> PaymentGateway : uses
+
++note for StripeGateway "external API"
+
+-PaymentGateway

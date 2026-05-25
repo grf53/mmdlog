@@ -1,0 +1,28 @@
+{
+  "name": "mmdlog",
+  "version": "0.1.0",
+  "description": "Append-only, event-sourced syntax that compiles to Mermaid and renders as .mmd / .svg / .png / animated .gif",
+  "type": "module",
+  "bin": {
+    "mmdlog": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/cli.js",
+    "web": "node scripts/serve-web.mjs",
+    "test": "npm run build && node --test --test-concurrency=1 test/*.test.js"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "dompurify": "^3.4.5",
+    "gifenc": "^1.0.3",
+    "jsdom": "^29.1.1",
+    "mermaid": "^11.15.0"
+  },
+  "devDependencies": {
+    "@mermaid-js/mermaid-cli": "^11.15.0",
+    "@types/jsdom": "^28.0.3",
+    "@types/node": "^25.8.0"
+  }
+}

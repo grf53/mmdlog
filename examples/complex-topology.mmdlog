@@ -1,0 +1,54 @@
+# Complex topology with updates, removals, and resurrection.
+@diagram graph TD
+
++Client[Web Client]
++Gateway[API Gateway]
++Auth[Auth Service]
++UserDB[User Database]
++Cache[Redis Cache]
++Queue[Event Queue]
++Worker[Async Worker]
++Billing[Billing Service]
++Ledger[Ledger DB]
+
++Client --> Gateway
++Gateway --> Auth
++Auth --> UserDB
++Gateway --> Cache
++Gateway --> Queue
++Queue --> Worker
++Worker --> Billing
++Billing --> Ledger
+
+# Rename and expand role.
++Gateway[Unified API Gateway]
+
+# Temporary path to warm cache.
++Client --> Cache
+-Client --> Cache
+
+# Decommission legacy auth path.
+-Gateway --> Auth
+-Auth
+
+# Replace auth with identity.
++Identity[Identity Service]
++Gateway --> Identity
++Identity --> UserDB
+
+# Replace queue backend.
+-Queue
++Stream[Event Stream]
++Gateway --> Stream
++Stream --> Worker
+
+# Billing rewrite with safer ledger flow.
+-Worker --> Billing
++BillingV2[Billing Service v2]
++Worker --> BillingV2
++BillingV2 --> Ledger
+-Billing
+
+# Later rollback: disable cache connection and re-enable direct db route.
+-Gateway --> Cache
++Gateway --> UserDB

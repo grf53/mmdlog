@@ -1,0 +1,11 @@
+@diagram sequence
+!+participant Client as Web Client
+!+participant API as API Server
+!+participant DB as Main Database
++autonumber
++Client->>API: GET /users
++Note over API,DB: cache miss
++API->>DB: SELECT users
++DB->>API: rows
++API->>Client: 200 OK
+-DB

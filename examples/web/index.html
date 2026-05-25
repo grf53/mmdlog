@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>Merlog GIF — browser demo</title>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", sans-serif; max-width: 980px; margin: 24px auto; padding: 0 16px; color: #222; }
+    h1 { font-size: 20px; margin: 0 0 12px; }
+    .row { display: flex; gap: 12px; margin: 8px 0; flex-wrap: wrap; align-items: center; }
+    .input-wrap { position: relative; min-height: 180px; }
+    .input-wrap textarea,
+    .input-wrap pre.input-highlight {
+      font-family: ui-monospace, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      padding: 8px;
+      border: 1px solid #ddd;
+      width: 100%;
+      min-height: 180px;
+      box-sizing: border-box;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+      tab-size: 2;
+    }
+    .input-wrap textarea {
+      position: absolute;
+      inset: 0;
+      background: transparent;
+      color: transparent;
+      caret-color: #222;
+      z-index: 2;
+      resize: vertical;
+    }
+    .input-wrap pre.input-highlight {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      background: white;
+      color: #24292f;
+      overflow: auto;
+    }
+    .input-wrap textarea::selection { background: rgba(45, 105, 215, 0.25); }
+    .token.comment { color: #6e7781; font-style: italic; }
+    .token.string, .token.text { color: #032f62; }
+    .token.keyword, .token.directive, .token.diagram-type { color: #cf222e; font-weight: 600; }
+    .token.operator, .token.rel-op, .token.prefix, .token.arrow, .token.arrow-head { color: #0550ae; font-weight: 600; }
+    .token.important, .token.silent, .token.annotation { color: #bc4c00; font-weight: 700; }
+    .token.number { color: #0550ae; }
+    .token.punctuation { color: #57606a; }
+    .token.class-name { color: #116329; font-weight: 500; }
+    .token.variable { color: #24292f; }
+    .token.property, .token.label { color: #953800; }
+    .token.entity { color: #8250df; }
+    select, input, button { font-size: 14px; padding: 4px 8px; }
+    button { cursor: pointer; }
+    #status { margin: 8px 0; font-size: 13px; color: #555; min-height: 18px; }
+    .playback { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; align-items: start; }
+    #preview { width: 100%; height: auto; border: 1px solid #ddd; display: block; background: #fafafa; }
+    #frame-mermaid { background: #f6f8fa; border: 1px solid #ddd; padding: 8px; margin: 0; font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.5; white-space: pre; overflow: auto; max-height: 480px; color: #24292f; }
+    #frame-label { font-size: 12px; color: #777; margin-bottom: 4px; }
+    .warn { color: #c50; font-size: 12px; white-space: pre-wrap; background: #fff8e6; padding: 4px 8px; border-left: 3px solid #c50; margin: 4px 0; }
+    a.download { margin-left: 8px; }
+    label { font-size: 13px; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "mermaid": "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs",
+      "gifenc": "https://cdn.jsdelivr.net/npm/gifenc@1/+esm",
+      "canvg": "https://cdn.jsdelivr.net/npm/canvg@4/+esm"
+    }
+  }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-core.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-mermaid.min.js"></script>
+</head>
+<body>
+  <h1>Merlog GIF — browser demo</h1>
+  <p style="font-size:13px;color:#555;">mermaid + gifenc + canvas로 브라우저에서 직접 합성. Node CLI에서 jsdom 한계로 깨지던 케이스도 여기선 동작합니다.</p>
+
+  <div class="row">
+    <label>example
+      <select id="examples"></select>
+    </label>
+    <label>width <input id="width" type="number" value="800" min="100" step="20" style="width:80px"></label>
+    <label>height <input id="height" type="number" value="450" min="100" step="20" style="width:80px"></label>
+    <label>fps <input id="fps" type="number" value="2" min="0.2" step="0.2" style="width:60px"></label>
+    <label>hold last (ms) <input id="holdMs" type="number" value="0" min="0" step="100" style="width:80px"></label>
+    <label><input id="collapse" type="checkbox" checked> collapse dup frames</label>
+    <button id="run">Generate GIF</button>
+    <a id="download" class="download" style="display:none" download="merlog.gif">⬇︎ download</a>
+  </div>
+
+  <div class="input-wrap">
+    <pre id="input-highlight" class="input-highlight" aria-hidden="true"></pre>
+    <textarea id="input" placeholder="merlog source..." spellcheck="false"></textarea>
+  </div>
+
+  <div id="status"></div>
+  <div id="warnings"></div>
+  <div class="playback">
+    <div>
+      <div id="frame-label"></div>
+      <canvas id="preview"></canvas>
+    </div>
+    <div>
+      <div id="frame-label-2" style="font-size:12px;color:#777;margin-bottom:4px">mermaid source for current frame</div>
+      <pre id="frame-mermaid"></pre>
+    </div>
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

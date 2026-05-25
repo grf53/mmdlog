@@ -1,0 +1,13 @@
+# raw-passthrough demo: single-line mermaid features without dedicated mmdlog syntax.
+@diagram sequence
+!+participant U as User
+!+participant A as App
+!+participant DB as Database
++autonumber
++U->>A: login
++Note over U,A: session check
++A->>DB: load profile
++Note right of DB: lookup by id
++DB->>A: profile
++A--xU: 401 (denied path shown)
++A->>U: welcome

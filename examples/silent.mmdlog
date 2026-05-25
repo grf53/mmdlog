@@ -1,0 +1,8 @@
+@diagram graph TD
+!+A[API]
+!+B[DB]
++A --> B
++C[Redis]
++A --> C
+!-B
++A --> C

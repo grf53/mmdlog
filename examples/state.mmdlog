@@ -1,0 +1,11 @@
+@diagram state
+!+state Idle
+!+state Loading
+!+state Success
+!+state Error
++[*] --> Idle
++Idle --> Loading : fetch
++Loading --> Success : ok
++Loading --> Error : fail
++note right of Loading : may take a while
+-Error

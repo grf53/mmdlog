@@ -1,0 +1,10 @@
+@diagram gitGraph
++commit id: "c1"
++commit id: "c2" tag: "v1.0"
++branch feature
++checkout feature
++commit id: "f1"
++commit id: "f2" type: HIGHLIGHT
++checkout main
++merge feature
++commit id: "c3" tag: "v1.1"

@@ -1,0 +1,10 @@
+@diagram gantt
+!+title mmdlog Milestones
+!+dateFormat YYYY-MM-DD
+!+axisFormat %m/%d
+!+excludes weekends
++section Core
++Parser : done, p1, 2026-05-01, 7d
++Reducer : active, p2, after p1, 6d
++section Replay
++Frames : p3, 2026-05-15, 5d

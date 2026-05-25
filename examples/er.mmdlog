@@ -1,0 +1,8 @@
+@diagram er
+!+entity USER
+!+entity ORDER
++attr USER int id PK
++attr USER string email UK
++attr ORDER int id PK
++attr ORDER int user_id FK
++USER ||--o{ ORDER : places
