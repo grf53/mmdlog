@@ -138,3 +138,48 @@ export function emitMermaid(state: CoreState): string {
   const rawBlock = state.rawLines.map((l) => `  ${l}`).join("\n");
   return `${body}\n${rawBlock}`;
 }
+
+const DELTA_WIDTH = "2.5px";
+const ADD_STYLE = { cls: "_mmdlog_new", fill: "#dcfce7", stroke: "#16a34a", text: "#166534" };
+const DEL_STYLE = { cls: "_mmdlog_del", fill: "#fee2e2", stroke: "#dc2626", text: "#991b1b" };
+
+type HighlightStyle = { cls: string; fill: string; stroke: string; text: string };
+
+// Highlights graph elements present in `base` but absent in `other`.
+function graphHighlightLines(base: CoreState, other: CoreState | null, style: HighlightStyle): string[] {
+  const nodes: string[] = [];
+  for (const id of base.graph.nodes.keys()) {
+    if (!other || !other.graph.nodes.has(id)) nodes.push(id);
+  }
+  const edgeIndices: number[] = [];
+  let idx = 0;
+  for (const key of base.graph.edges.keys()) {
+    if (!other || !other.graph.edges.has(key)) edgeIndices.push(idx);
+    idx += 1;
+  }
+  if (nodes.length === 0 && edgeIndices.length === 0) return [];
+  const lines: string[] = [
+    `  classDef ${style.cls} fill:${style.fill},stroke:${style.stroke},stroke-width:${DELTA_WIDTH},color:${style.text}`
+  ];
+  if (nodes.length > 0) lines.push(`  class ${nodes.join(",")} ${style.cls}`);
+  if (edgeIndices.length > 0) {
+    lines.push(`  linkStyle ${edgeIndices.join(",")} stroke:${style.stroke},stroke-width:${DELTA_WIDTH}`);
+  }
+  return lines;
+}
+
+// Renders `state` with newly-added elements (vs `prev`) tinted green.
+export function emitMermaidWithDelta(state: CoreState, prev: CoreState | null): string {
+  const base = emitMermaid(state);
+  if (state.diagram !== "graph") return base;
+  const lines = graphHighlightLines(state, prev, ADD_STYLE);
+  return lines.length === 0 ? base : `${base}\n${lines.join("\n")}`;
+}
+
+// Renders the pre-removal `prev` state with elements absent in `next` tinted red.
+export function emitMermaidWithRemoval(prev: CoreState, next: CoreState): string {
+  const base = emitMermaid(prev);
+  if (prev.diagram !== "graph") return base;
+  const lines = graphHighlightLines(prev, next, DEL_STYLE);
+  return lines.length === 0 ? base : `${base}\n${lines.join("\n")}`;
+}

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
-import { parseMerlog, reduceEvents, emitMermaid, replayTimeline } from "./core/index.js";
+import { parseMmdlog, reduceEvents, emitMermaid, replayTimeline } from "./core/index.js";
 import { writeFrames, writeGif } from "./replay/renderer.js";
 import { renderMermaidToSvg } from "./replay/mermaidNode.js";
 import { svgToPngIsolated } from "./replay/rasterize.js";
@@ -19,6 +19,8 @@ interface ParsedArgs {
   height?: number;
   collapse?: boolean;
   holdMs?: number;
+  highlight?: boolean;
+  flashMs?: number;
 }
 
 function usage(): string {
@@ -28,8 +30,8 @@ function usage(): string {
     "  mmdlog check <input.mmdlog>",
     "  mmdlog print-state <input.mmdlog>",
     "  mmdlog replay <input.mmdlog> [--json]",
-    "  mmdlog frames <input.mmdlog> [-o <dir>] [--format mmd|svg|png] [--width N] [--height N] [--no-collapse]",
-    "  mmdlog gif <input.mmdlog> [-o <output.gif>] [--fps N] [--width N] [--height N] [--no-collapse] [--hold-ms N]"
+    "  mmdlog frames <input.mmdlog> [-o <dir>] [--format mmd|svg|png] [--width N] [--height N] [--no-collapse] [--highlight]",
+    "  mmdlog gif <input.mmdlog> [-o <output.gif>] [--fps N] [--width N] [--height N] [--no-collapse] [--hold-ms N] [--highlight] [--flash-ms N]"
   ].join("\n");
 }
 
@@ -58,6 +60,8 @@ function parseArgs(argv: string[]): ParsedArgs {
   let height: number | undefined;
   let collapse: boolean | undefined;
   let holdMs: number | undefined;
+  let highlight: boolean | undefined;
+  let flashMs: number | undefined;
   for (let i = 0; i < rest.length; i += 1) {
     if (rest[i] === "-o") {
       const next = rest[i + 1];
@@ -112,6 +116,19 @@ function parseArgs(argv: string[]): ParsedArgs {
       collapse = false;
       continue;
     }
+    if (rest[i] === "--highlight") {
+      highlight = true;
+      continue;
+    }
+    if (rest[i] === "--flash-ms") {
+      const next = Number(rest[i + 1]);
+      if (!Number.isFinite(next) || next <= 0) {
+        throw new Error("invalid --flash-ms value");
+      }
+      flashMs = next;
+      i += 1;
+      continue;
+    }
     if (rest[i] === "--hold-ms") {
       const next = Number(rest[i + 1]);
       if (!Number.isFinite(next) || next < 0) {
@@ -128,7 +145,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     throw new Error(`missing input path\n\n${usage()}`);
   }
 
-  return { command: commandRaw, inputPath, outPath, json, format, fps, width, height, collapse, holdMs };
+  return { command: commandRaw, inputPath, outPath, json, format, fps, width, height, collapse, holdMs, highlight, flashMs };
 }
 
 function formatReplayFrames(inputPath: string, frames: ReturnType<typeof replayTimeline>): string {
@@ -196,7 +213,7 @@ function formatState(state: ReturnType<typeof reduceEvents>): string {
 async function run(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const source = await readFile(args.inputPath, "utf-8");
-  const { events, warnings } = parseMerlog(source, { strict: args.command !== "check" });
+  const { events, warnings } = parseMmdlog(source, { strict: args.command !== "check" });
   const state = reduceEvents(events);
 
   if (args.command === "check") {
@@ -239,7 +256,7 @@ async function run(): Promise<void> {
   }
 
   if (args.command === "frames") {
-    const frames = replayTimeline(events);
+    const frames = replayTimeline(events, { highlight: args.highlight });
     const outDir = args.outPath ?? "frames";
     const format = args.format ?? "svg";
     const collapse = args.collapse ?? true;
@@ -249,11 +266,11 @@ async function run(): Promise<void> {
   }
 
   if (args.command === "gif") {
-    const frames = replayTimeline(events);
+    const frames = replayTimeline(events, { highlight: args.highlight, flash: args.highlight });
     const outGif = args.outPath ?? "changes.gif";
     const collapse = args.collapse ?? true;
     const holdMs = args.holdMs ?? 0;
-    const outputPath = await writeGif(frames, outGif, args.fps, args.width, args.height, collapse, holdMs);
+    const outputPath = await writeGif(frames, outGif, args.fps, args.width, args.height, collapse, holdMs, args.flashMs);
     console.log(`Wrote GIF: ${outputPath}`);
     return;
   }

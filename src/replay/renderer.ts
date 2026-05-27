@@ -10,6 +10,7 @@ export type FrameFormat = "mmd" | "svg" | "png";
 const DEFAULT_WIDTH = 1280;
 const DEFAULT_HEIGHT = 720;
 const DEFAULT_FPS = 2;
+const DEFAULT_FLASH_MS = 150;
 
 function frameBase(step: number): string {
   return `frame-${String(step).padStart(5, "0")}`;
@@ -101,21 +102,24 @@ export async function writeFrames(
 export async function renderFramesToRgba(
   frames: ReplayFrame[],
   width = DEFAULT_WIDTH,
-  height = DEFAULT_HEIGHT
+  height = DEFAULT_HEIGHT,
+  delayFor?: (frame: ReplayFrame) => number
 ): Promise<RgbaFrame[]> {
   const out: RgbaFrame[] = [];
   let previous: RgbaFrame | null = null;
   for (const frame of frames) {
     if (isInvisibleFrame(frame)) continue;
+    const delayMs = delayFor ? delayFor(frame) : undefined;
     try {
       const svg = await renderMermaidToSvg(frame.mermaid);
       const rgba = rasterizeSvgIsolated(svg, { width, height });
-      out.push(rgba);
+      out.push(delayMs === undefined ? rgba : { ...rgba, delayMs });
       previous = rgba;
     } catch (err) {
       const message = (err as Error).message;
       console.error(`warn: frame ${frame.step} (line ${frame.event.line}) render failed: ${message}`);
-      out.push(previous ?? blankFrame(width, height));
+      const base = previous ?? blankFrame(width, height);
+      out.push(delayMs === undefined ? base : { ...base, delayMs });
     }
   }
   return out;
@@ -128,11 +132,12 @@ export async function writeGif(
   width = DEFAULT_WIDTH,
   height = DEFAULT_HEIGHT,
   collapse = true,
-  holdMs = 0
+  holdMs = 0,
+  flashMs = DEFAULT_FLASH_MS
 ): Promise<string> {
   const input = collapse ? collapseConsecutive(frames) : frames;
-  const rgbaFrames = await renderFramesToRgba(input, width, height);
   const delayMs = Math.max(20, Math.round(1000 / fps));
+  const rgbaFrames = await renderFramesToRgba(input, width, height, (f) => (f.flash ? flashMs : delayMs));
   if (holdMs > 0 && rgbaFrames.length > 0) {
     const last = rgbaFrames[rgbaFrames.length - 1];
     rgbaFrames[rgbaFrames.length - 1] = { ...last, delayMs: Math.max(holdMs, delayMs) };

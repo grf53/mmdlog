@@ -1,7 +1,7 @@
 import mermaid from "mermaid";
 import { GIFEncoder, quantize, applyPalette } from "gifenc";
 import { Canvg } from "canvg";
-import { parseMerlog, replayTimeline } from "../../dist/core/index.js";
+import { parseMmdlog, replayTimeline } from "../../dist/core/index.js";
 
 const Prism = window.Prism;
 
@@ -9,19 +9,19 @@ if (!Prism.languages.mermaid) {
   throw new Error("Prism mermaid component failed to load");
 }
 
-Prism.languages.merlog = Prism.languages.extend("mermaid", {
+Prism.languages.mmdlog = Prism.languages.extend("mermaid", {
   comment: { pattern: /#.*/, greedy: true }
 });
 
-Prism.languages.insertBefore("merlog", "comment", {
+Prism.languages.insertBefore("mmdlog", "comment", {
   silent: { pattern: /^!/m, alias: "important" },
   directive: { pattern: /^@diagram\b/m, alias: "keyword" },
   prefix: { pattern: /^[+\-]/m, alias: "operator" },
-  "merlog-keyword": {
+  "mmdlog-keyword": {
     pattern: /\b(?:member|attr|actor|entity|section|title|dateFormat|axisFormat|commit|branch|checkout|merge|TD|LR|BT|RL)\b/,
     alias: "keyword"
   },
-  "merlog-id-upper": {
+  "mmdlog-id-upper": {
     pattern: /\b[A-Z][A-Za-z0-9_-]*\b/,
     alias: "class-name"
   }
@@ -96,7 +96,7 @@ async function loadExample() {
 function syncInputHighlight() {
   const hl = $("input-highlight");
   if (!hl) return;
-  hl.innerHTML = highlightWith("merlog", input.value);
+  hl.innerHTML = highlightWith("mmdlog", input.value);
   hl.scrollTop = input.scrollTop;
   hl.scrollLeft = input.scrollLeft;
 }
@@ -128,7 +128,7 @@ function startPlayback(infos) {
   const tick = () => {
     const info = playbackFrames[playbackIndex];
     ctx.putImageData(info.imageData, 0, 0);
-    $("frame-mermaid").innerHTML = highlightWith("merlog", info.mermaid);
+    $("frame-mermaid").innerHTML = highlightWith("mmdlog", info.mermaid);
     $("frame-label").textContent = `frame ${playbackIndex + 1} / ${playbackFrames.length} · ${info.delayMs}ms · step ${info.step} (line ${info.line})`;
     playbackIndex = (playbackIndex + 1) % playbackFrames.length;
     playbackTimer = setTimeout(tick, info.delayMs);
@@ -285,12 +285,14 @@ async function generate() {
   const delayMs = Math.max(20, Math.round(1000 / fps));
 
   const collapse = $("collapse") ? $("collapse").checked : true;
+  const highlight = $("highlight") ? $("highlight").checked : false;
   const holdMs = Math.max(0, +($("holdMs")?.value ?? 0));
+  const flashMs = Math.max(20, +($("flashMs")?.value ?? 150));
 
   try {
-    const { events, warnings: parseWarnings } = parseMerlog(input.value, { strict: false });
+    const { events, warnings: parseWarnings } = parseMmdlog(input.value, { strict: false });
     for (const w of parseWarnings) appendWarning(w);
-    let frames = replayTimeline(events);
+    let frames = replayTimeline(events, { highlight, flash: highlight });
     if (collapse) frames = collapseConsecutive(frames);
 
     if (frames.length === 0) {
@@ -308,11 +310,15 @@ async function generate() {
 
       if (isInvisibleFrame(frames[i])) continue;
       const isLast = i === frames.length - 1;
-      const frameDelay = isLast && holdMs > 0 ? Math.max(holdMs, delayMs) : delayMs;
+      const frameDelay = frames[i].flash
+        ? flashMs
+        : isLast && holdMs > 0
+          ? Math.max(holdMs, delayMs)
+          : delayMs;
 
       let svg;
       try {
-        const result = await mermaid.render(`merlog-${++renderId}`, frames[i].mermaid);
+        const result = await mermaid.render(`mmdlog-${++renderId}`, frames[i].mermaid);
         svg = result.svg;
       } catch (err) {
         appendWarning(`frame ${i + 1} (line ${frames[i].event.line}): ${err.message}`);

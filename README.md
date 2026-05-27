@@ -265,7 +265,7 @@ erDiagram
 ### journey
 ```
 @diagram journey
-!+title Merlog Adoption
+!+title mmdlog Adoption
 !+section Discover
 +Search docs : 4 : User
 +Read examples : 3 : User
@@ -277,7 +277,7 @@ erDiagram
 
 ```mermaid
 journey
-  title Merlog Adoption
+  title mmdlog Adoption
   section Discover
     Search docs: 4: User
     Read examples: 3: User
@@ -294,7 +294,7 @@ The most recent `+section` sets the active section for subsequent tasks (mermaid
 ### gantt
 ```
 @diagram gantt
-!+title Merlog Milestones
+!+title mmdlog Milestones
 !+dateFormat YYYY-MM-DD
 !+axisFormat %m/%d
 !+excludes weekends
@@ -309,7 +309,7 @@ The most recent `+section` sets the active section for subsequent tasks (mermaid
 
 ```mermaid
 gantt
-  title Merlog Milestones
+  title mmdlog Milestones
   dateFormat YYYY-MM-DD
   axisFormat %m/%d
   excludes weekends
@@ -483,6 +483,18 @@ graph TD
 | pie | `-title` / `-"label"` | title / slice |
 | gitGraph | — | not supported (commit ledger is structurally append-only) |
 
+## Highlighting deltas
+
+`--highlight` tints changed elements so the viewer sees *what changed* — not just the new state. Additions flash **green**; removals flash **red** on the pre-removal state (the element is shown one last time, doomed, before it disappears). The diff is computed against the previous **visible** frame (silent events are folded in).
+
+![highlight demo](examples/output/basic-highlight.gif)
+
+Behavior differs by command:
+- **`gif`** — each step *flashes*: a brief tinted frame (`--flash-ms`, default 150ms) then the normal frame held for the usual interval. Additions → green flash on the new element; removals → red flash on the about-to-be-removed element, then it's gone.
+- **`frames`** — one green-tinted static frame per addition step (no flash; timing is meaningless for static output). Removals show the plain post-removal state (the red flash is animation-only).
+
+Works for `graph` only in v1 (uses mermaid's `classDef` + `linkStyle`). Other diagram types fall through to unstyled output.
+
 ## CLI
 
 ```
@@ -490,8 +502,8 @@ mmdlog render <input.mmdlog> [-o out] [--format mmd|svg|png] [--width N] [--heig
 mmdlog check <input.mmdlog>
 mmdlog print-state <input.mmdlog>
 mmdlog replay <input.mmdlog> [--json]
-mmdlog frames <input.mmdlog> [-o dir/] [--format mmd|svg|png] [--width N] [--height N] [--no-collapse]
-mmdlog gif <input.mmdlog> [-o out.gif] [--fps N] [--width N] [--height N] [--no-collapse] [--hold-ms N]
+mmdlog frames <input.mmdlog> [-o dir/] [--format mmd|svg|png] [--width N] [--height N] [--no-collapse] [--highlight]
+mmdlog gif <input.mmdlog> [-o out.gif] [--fps N] [--width N] [--height N] [--no-collapse] [--hold-ms N] [--highlight] [--flash-ms N]
 ```
 
 `render` emits the **final** state only. `--format svg|png` rasterizes once and requires `-o`; `--format mmd` (default) writes text to `-o` or stdout.
@@ -505,6 +517,8 @@ mmdlog gif <input.mmdlog> [-o out.gif] [--fps N] [--width N] [--height N] [--no-
 | `--fps N` | gif | 2 |
 | `--no-collapse` | frames / gif | off — consecutive identical frames are collapsed by default |
 | `--hold-ms N` | gif | 0 — extends the last frame's display time |
+| `--highlight` | frames / gif | off — see [Highlighting deltas](#highlighting-deltas) |
+| `--flash-ms N` | gif | 150 — duration of the highlighted flash frame (with `--highlight`) |
 | `--json` | replay | off |
 
 `npm link` exposes a `mmdlog` binary: `mmdlog gif input.mmdlog -o out.gif`.
@@ -515,17 +529,17 @@ Static demo:
 ```bash
 npm run web
 ```
-Open `http://localhost:5173/examples/web/`. Pick an example, hit **Generate GIF**. A `<canvas>` plays the animation in sync with a syntax-highlighted Mermaid panel; the GIF blob is also downloadable.
+Open `http://localhost:5173/examples/web/`. Pick an example, hit **Generate GIF**. A `<canvas>` plays the animation in sync with a syntax-highlighted Mermaid panel; the GIF blob is also downloadable. The **highlight deltas** checkbox toggles the same green delta styling as the CLI `--highlight` flag (graph only).
 
 Embed as a library:
 ```js
 import mermaid from "mermaid";
-import { parseMerlog, replayTimeline } from "mmdlog/dist/core/index.js";
+import { parseMmdlog, replayTimeline } from "mmdlog/dist/core/index.js";
 import { encodeMermaidFramesToGif } from "mmdlog/dist/replay/browser.js";
 
 mermaid.initialize({ startOnLoad: false, htmlLabels: false });
 
-const { events } = parseMerlog(source, { strict: false });
+const { events } = parseMmdlog(source, { strict: false });
 const frames = replayTimeline(events);
 
 const bytes = await encodeMermaidFramesToGif(

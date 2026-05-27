@@ -293,7 +293,7 @@ export interface AddRawEvent extends BaseEvent {
   content: string;
 }
 
-export type MerlogEvent =
+export type MmdlogEvent =
   | SetDiagramEvent
   | AddNodeEvent
   | AddEdgeEvent
@@ -476,13 +476,14 @@ export interface ParseOptions {
 }
 
 export interface ParseResult {
-  events: MerlogEvent[];
+  events: MmdlogEvent[];
   warnings: string[];
 }
 
 export interface ReplayFrame {
   step: number;
-  event: MerlogEvent;
+  event: MmdlogEvent;
   state: CoreState;
   mermaid: string;
+  flash?: boolean;
 }
