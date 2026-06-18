@@ -1,16 +1,19 @@
-export { emitMermaid } from "./emitter.js";
-export { parseMerlog } from "./parser.js";
+export { emitMermaid, emitMermaidWithDelta, emitMermaidWithRemoval } from "./emitter.js";
+export { parseMmdlog } from "./parser.js";
 export { reduceEvents, reducePrefixes } from "./reducer.js";
 export { replayTimeline } from "./replay.js";
+export type { ReplayOptions } from "./replay.js";
 export type {
   CoreState,
   DiagramKind,
   EdgeState,
   EventKind,
   GraphState,
-  MerlogEvent,
+  HighlightedEmit,
+  MmdlogEvent,
   NodeState,
   ParseOptions,
   ParseResult,
-  ReplayFrame
+  ReplayFrame,
+  SequenceItem
 } from "./types.js";

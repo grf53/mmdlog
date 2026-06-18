@@ -384,10 +384,192 @@ async function getMermaid(): Promise<MermaidApi> {
 
 let counter = 0;
 
+// mermaid wraps text labels in <switch><foreignObject>HTML</foreignObject><text>fallback</text></switch>.
+// resvg-js (usvg) doesn't render foreignObject HTML and mishandles the switch fallback selection,
+// so we strip foreignObject elements outright to leave the SVG <text> fallback visible.
+function stripForeignObjects(svg: string): string {
+  return svg.replace(/<foreignObject\b[^>]*>[\s\S]*?<\/foreignObject>/g, "");
+}
+
+// Brace-aware CSS rule iterator. Skips @-rules (with potentially nested braces) and yields
+// only top-level CSSStyleRules. jsdom's CSSOM doesn't parse <style> blocks embedded in SVG
+// so we extract and walk the CSS text manually.
+function* parseCssStyleRules(css: string): Iterable<{ selectors: string; decls: string }> {
+  let i = 0;
+  while (i < css.length) {
+    while (i < css.length && /\s/.test(css[i])) i += 1;
+    if (i >= css.length) break;
+    if (css[i] === "@") {
+      while (i < css.length && css[i] !== "{" && css[i] !== ";") i += 1;
+      if (i >= css.length) break;
+      if (css[i] === ";") { i += 1; continue; }
+      // @-rule with a block — skip the entire balanced block.
+      i += 1;
+      let depth = 1;
+      while (i < css.length && depth > 0) {
+        if (css[i] === "{") depth += 1;
+        else if (css[i] === "}") depth -= 1;
+        i += 1;
+      }
+      continue;
+    }
+    const selStart = i;
+    while (i < css.length && css[i] !== "{") i += 1;
+    if (i >= css.length) break;
+    const selectors = css.slice(selStart, i).trim();
+    i += 1;
+    const declStart = i;
+    let depth = 1;
+    while (i < css.length && depth > 0) {
+      if (css[i] === "{") depth += 1;
+      else if (css[i] === "}") depth -= 1;
+      if (depth > 0) i += 1;
+    }
+    const decls = css.slice(declStart, i).trim();
+    i += 1;
+    if (selectors && decls) yield { selectors, decls };
+  }
+}
+
+// resvg-js does not apply CSS rules inside <style> blocks for non-trivial selectors
+// (attribute, class, ID-prefixed). Convert each style rule to an inline `style="…"`
+// attribute on its matching elements so the rasterizer renders them correctly.
+async function inlineEmbeddedStyles(svg: string): Promise<string> {
+  if (!svg.includes("<style")) return svg;
+  const { JSDOM } = await import("jsdom");
+  const dom = new JSDOM(`<!DOCTYPE html><body>${svg}</body>`);
+  const doc = dom.window.document;
+  const styleEls = Array.from(doc.querySelectorAll("style"));
+  for (const styleEl of styleEls) {
+    const cssText = styleEl.textContent ?? "";
+    if (!cssText.trim()) continue;
+    for (const { selectors, decls } of parseCssStyleRules(cssText)) {
+      try {
+        doc.body.querySelectorAll(selectors).forEach((el) => {
+          // mermaid's <text> fallback assumes non-CSS renderers, so element XML
+          // presentation attributes (e.g. fill="#191970" on a section rect) carry the
+          // intended value. Skip per-property if the element already declares it as
+          // an XML attribute — only fill in CSS for properties without an XML value.
+          const filtered = decls
+            .split(";")
+            .map((d) => d.trim())
+            .filter(Boolean)
+            .filter((d) => {
+              const colon = d.indexOf(":");
+              if (colon < 0) return false;
+              const prop = d.slice(0, colon).trim().toLowerCase();
+              if (!el.hasAttribute(prop)) return true;
+              const attrVal = (el.getAttribute(prop) ?? "").trim().toLowerCase();
+              // Treat placeholder values ("", "none", "undefined") as "no value" so
+              // the CSS class rule can supply the real value mermaid intends.
+              return attrVal === "" || attrVal === "none" || attrVal === "undefined";
+            });
+          if (filtered.length === 0) return;
+          const cur = el.getAttribute("style") ?? "";
+          const sep = cur && !cur.trim().endsWith(";") ? ";" : "";
+          el.setAttribute("style", `${cur}${sep}${filtered.join(";")}`);
+        });
+      } catch {
+        // selector unsupported by jsdom — skip
+      }
+    }
+  }
+  // Overlay rules to repair gaps in mermaid's SVG fallback. mermaid expects browsers
+  // to render labels via <foreignObject> HTML; once we strip those, the leftover
+  // <text> elements inherit no readable color in some diagrams. Force visible text.
+  const overlayCss = `
+    text.task { fill: #ECECFF; }
+  `;
+  for (const { selectors, decls } of parseCssStyleRules(overlayCss)) {
+    try {
+      doc.body.querySelectorAll(selectors).forEach((el) => {
+        const cur = el.getAttribute("style") ?? "";
+        const sep = cur && !cur.trim().endsWith(";") ? ";" : "";
+        el.setAttribute("style", `${cur}${sep}${decls}`);
+      });
+    } catch {
+      // ignore
+    }
+  }
+  // Remove the original <style> block so usvg doesn't re-apply class rules
+  // (it does honor class selectors) and undo the XML-attribute preservation above.
+  styleEls.forEach((el) => el.remove());
+  // Unwrap `<switch>` elements — after foreignObject stripping they only carry the
+  // SVG `<text>` fallback, but the wrapper hides the text from sibling traversal /
+  // CSS adjacency selectors. Replace each switch with its children inline.
+  doc.body.querySelectorAll("switch").forEach((sw) => {
+    const parent = sw.parentNode;
+    if (!parent) return;
+    while (sw.firstChild) parent.insertBefore(sw.firstChild, sw);
+    parent.removeChild(sw);
+  });
+  // Downgrade `orient="auto-start-reverse"` (SVG2) to `orient="auto"` since usvg
+  // doesn't recognize the SVG2 value and falls back to no rotation, causing
+  // arrowheads on right-to-left lines to point the wrong way. This is a usvg
+  // compatibility fix — needed for plain rendering too.
+  doc.body.querySelectorAll("marker[orient='auto-start-reverse']").forEach((m) => {
+    m.setAttribute("orient", "auto");
+  });
+  // mermaid emits malformed inline styles like style="undefined;;;undefined;stroke:#333"
+  // which causes usvg to drop the whole declaration block. Sanitize every element's
+  // style so valid declarations survive.
+  doc.body.querySelectorAll("[style]").forEach((el) => {
+    const raw = el.getAttribute("style") ?? "";
+    const cleaned = raw
+      .split(";")
+      .map((t) => t.trim())
+      .filter((t) => t && t !== "undefined" && !t.startsWith("undefined:"))
+      .join(";");
+    if (cleaned !== raw) el.setAttribute("style", cleaned);
+  });
+  const svgEl = doc.body.querySelector("svg");
+  return svgEl ? svgEl.outerHTML : svg;
+}
+
 export async function renderMermaidToSvg(code: string): Promise<string> {
   const mermaid = await getMermaid();
   counter += 1;
   const id = `mmdlog-frame-${counter}`;
   const result = await mermaid.render(id, code);
-  return result.svg;
+  return await inlineEmbeddedStyles(stripForeignObjects(result.svg));
+}
+
+// Highlight-only SVG hooks: marker size lock + journey task tagging. Skipped for
+// plain (no-highlight) rendering so those frames stay closer to mermaid's output.
+export async function applyHighlightHooks(svg: string): Promise<string> {
+  const { JSDOM } = await import("jsdom");
+  const dom = new JSDOM(`<!DOCTYPE html><body>${svg}</body>`);
+  const doc = dom.window.document;
+  // Markers default to markerUnits="strokeWidth", so highlight stroke-width bumps
+  // (e.g. 4px) inflate the arrowhead. Lock to user-space units to keep markers
+  // a constant size regardless of stroke-width.
+  doc.body.querySelectorAll("marker").forEach((m) => {
+    if (!m.hasAttribute("markerUnits")) m.setAttribute("markerUnits", "userSpaceOnUse");
+  });
+  // mermaid journey gives each task-line a unique id (`…-taskN`) but the
+  // corresponding task rect / label text are unmarked. Tag those siblings with
+  // the task index so highlight CSS can target them via `[data-mmdlog-task]`.
+  doc.body.querySelectorAll("line.task-line[id]").forEach((line) => {
+    const id = line.getAttribute("id") ?? "";
+    const m = id.match(/-task(\d+)$/);
+    if (!m) return;
+    const taskIdx = m[1];
+    let sibling: Element | null = line.nextElementSibling;
+    let taggedRect = false;
+    let taggedText = false;
+    while (sibling && (!taggedRect || !taggedText)) {
+      if (!taggedRect && sibling.tagName.toLowerCase() === "rect" && sibling.classList.contains("task")) {
+        sibling.setAttribute("data-mmdlog-task", taskIdx);
+        taggedRect = true;
+      } else if (!taggedText && sibling.tagName.toLowerCase() === "text" && sibling.classList.contains("task")) {
+        sibling.setAttribute("data-mmdlog-task", taskIdx);
+        taggedText = true;
+      } else if (sibling.tagName.toLowerCase() === "line" && sibling.classList.contains("task-line")) {
+        break;
+      }
+      sibling = sibling.nextElementSibling;
+    }
+  });
+  const svgEl = doc.body.querySelector("svg");
+  return svgEl ? svgEl.outerHTML : svg;
 }

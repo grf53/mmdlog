@@ -79,7 +79,7 @@ Unrecognized lines after `+` fall through as **raw passthrough** — they're emi
 +A --> C
 ```
 
-<details><summary>output mermaid</summary>
+<details><summary>output mermaid(last frame)</summary>
 
 ```mermaid
 graph TD
@@ -107,7 +107,7 @@ graph TD
 -DB
 ```
 
-<details><summary>output mermaid</summary>
+<details><summary>output mermaid(last frame)</summary>
 
 ```mermaid
 sequenceDiagram
@@ -165,7 +165,7 @@ Other lines (`+class X`, relations like `+A --|> B`, `+note for X "…"`) are pl
 -PaymentGateway
 ```
 
-<details><summary>output mermaid</summary>
+<details><summary>output mermaid(last frame)</summary>
 
 ```mermaid
 classDiagram
@@ -208,7 +208,7 @@ classDiagram
 -Error
 ```
 
-<details><summary>output mermaid</summary>
+<details><summary>output mermaid(last frame)</summary>
 
 ```mermaid
 stateDiagram-v2
@@ -243,7 +243,7 @@ Relations (`+USER ||--o{ ORDER : places`) are plain mermaid.
 +USER ||--o{ ORDER : places
 ```
 
-<details><summary>output mermaid</summary>
+<details><summary>output mermaid(last frame)</summary>
 
 ```mermaid
 erDiagram
@@ -265,7 +265,7 @@ erDiagram
 ### journey
 ```
 @diagram journey
-!+title Merlog Adoption
+!+title mmdlog Adoption
 !+section Discover
 +Search docs : 4 : User
 +Read examples : 3 : User
@@ -273,11 +273,11 @@ erDiagram
 +Integrate SDK : 5 : User, Team
 ```
 
-<details><summary>output mermaid</summary>
+<details><summary>output mermaid(last frame)</summary>
 
 ```mermaid
 journey
-  title Merlog Adoption
+  title mmdlog Adoption
   section Discover
     Search docs: 4: User
     Read examples: 3: User
@@ -287,14 +287,18 @@ journey
 
 </details>
 
+<details><summary>Show GIF</summary>
+
 ![journey](examples/output/journey.gif)
+
+</details>
 
 The most recent `+section` sets the active section for subsequent tasks (mermaid's implicit section context).
 
 ### gantt
 ```
 @diagram gantt
-!+title Merlog Milestones
+!+title mmdlog Milestones
 !+dateFormat YYYY-MM-DD
 !+axisFormat %m/%d
 !+excludes weekends
@@ -305,11 +309,11 @@ The most recent `+section` sets the active section for subsequent tasks (mermaid
 +Frames : p3, 2026-05-15, 5d
 ```
 
-<details><summary>output mermaid</summary>
+<details><summary>output mermaid(last frame)</summary>
 
 ```mermaid
 gantt
-  title Merlog Milestones
+  title mmdlog Milestones
   dateFormat YYYY-MM-DD
   axisFormat %m/%d
   excludes weekends
@@ -322,7 +326,11 @@ gantt
 
 </details>
 
+<details><summary>Show GIF</summary>
+
 ![gantt](examples/output/gantt.gif)
+
+</details>
 
 ### pie
 ```
@@ -333,7 +341,7 @@ gantt
 +"DB" : 25
 ```
 
-<details><summary>output mermaid</summary>
+<details><summary>output mermaid(last frame)</summary>
 
 ```mermaid
 pie
@@ -345,7 +353,11 @@ pie
 
 </details>
 
+<details><summary>Show GIF</summary>
+
 ![pie](examples/output/pie.gif)
+
+</details>
 
 ### gitGraph
 ```
@@ -361,7 +373,7 @@ pie
 +commit id: "c3" tag: "v1.1"
 ```
 
-<details><summary>output mermaid</summary>
+<details><summary>output mermaid(last frame)</summary>
 
 ```mermaid
 gitGraph
@@ -378,7 +390,11 @@ gitGraph
 
 </details>
 
+<details><summary>Show GIF</summary>
+
 ![gitGraph](examples/output/gitgraph.gif)
+
+</details>
 
 ### Silent events (`!` prefix)
 
@@ -399,7 +415,7 @@ The first three lines are applied silently — they seed A, B, and the edge befo
 
 `@diagram` is always silent automatically (it's a directive, not content).
 
-<details><summary>output mermaid</summary>
+<details><summary>output mermaid(last frame)</summary>
 
 ```mermaid
 graph TD
@@ -416,7 +432,7 @@ graph TD
 
 Lines that don't match a structured pattern are emitted as-is. This means any single-line Mermaid syntax we don't explicitly model still works (notes, `autonumber`, `excludes`, `commit tag:`, etc.). See `examples/raw.mmdlog`:
 
-<details><summary>output mermaid</summary>
+<details><summary>output mermaid(last frame)</summary>
 
 ```mermaid
 sequenceDiagram
@@ -440,7 +456,7 @@ sequenceDiagram
 
 `examples/complex-topology.mmdlog` builds a full system through renames, removals, replacements, and rollbacks:
 
-<details><summary>output mermaid</summary>
+<details><summary>output mermaid(last frame)</summary>
 
 ```mermaid
 graph TD
@@ -483,6 +499,32 @@ graph TD
 | pie | `-title` / `-"label"` | title / slice |
 | gitGraph | — | not supported (commit ledger is structurally append-only) |
 
+## Highlighting deltas
+
+`--highlight` tints changed elements so the viewer sees *what changed* — not just the new state. Additions flash **green**; removals flash **red** on the pre-removal state (the element is shown one last time, doomed, before it disappears). The diff is computed against the previous **visible** frame (silent events are folded in).
+
+![highlight demo](examples/output/sequence-highlight.gif)
+
+Behavior differs by command:
+- **`gif`** — each step *flashes*: a brief tinted frame (`--flash-ms`, default 150ms) then the normal frame held for the usual interval. Additions → green flash on the new element; removals → red flash on the about-to-be-removed element, then it's gone.
+- **`frames`** — one green-tinted static frame per addition step (no flash; timing is meaningless for static output). Removals show the plain post-removal state (the red flash is animation-only).
+
+All diagrams are supported. Two mechanisms:
+- **`graph`** uses mermaid's native `classDef` + `linkStyle` (highlighting compiled into the mermaid source).
+- Everything else (`sequence`, `class`, `state`, `er`, `journey`, `gantt`, `pie`, `gitGraph`) injects a `<style>` block into the rendered SVG, targeting per-diagram selectors mermaid emits (`data-id`, `id="…-classId-X-…"`, `.section${N}`, `.commit.${id}`, etc.).
+
+![sequence highlight demo](examples/output/sequence-highlight.gif)
+
+Targeting per diagram (so you know what gets tinted):
+- **sequence** — participants (`data-id="X"`), messages & notes (`data-id="i${N}"`).
+- **class** — class boxes (`id*="-classId-X-"`), relations (`id^="id_From_To_"`); member additions also tint the parent class.
+- **state** — state nodes (`id*="-state-X-"`), transitions by index (`data-id="edge${i}"`).
+- **er** — entities (`id*="-entity-X-"`); attribute additions tint the parent entity.
+- **journey** — sections by index (`.section-type-${i}`), task lines (`id*="-task${i}"`).
+- **gantt** — title (`.titleText`), section rows (`.section${i}`), tasks by user-supplied id (`id$="-${taskId}"`).
+- **pie** — title (`.pieTitleText`), slices by ordinal (`text.slice:nth-of-type(N)`, `g.legend:nth-of-type(N)`).
+- **gitGraph** — commits by id (`circle.commit.${id}`). gitGraph removal is unsupported by design.
+
 ## CLI
 
 ```
@@ -490,8 +532,8 @@ mmdlog render <input.mmdlog> [-o out] [--format mmd|svg|png] [--width N] [--heig
 mmdlog check <input.mmdlog>
 mmdlog print-state <input.mmdlog>
 mmdlog replay <input.mmdlog> [--json]
-mmdlog frames <input.mmdlog> [-o dir/] [--format mmd|svg|png] [--width N] [--height N] [--no-collapse]
-mmdlog gif <input.mmdlog> [-o out.gif] [--fps N] [--width N] [--height N] [--no-collapse] [--hold-ms N]
+mmdlog frames <input.mmdlog> [-o dir/] [--format mmd|svg|png] [--width N] [--height N] [--no-collapse] [--highlight]
+mmdlog gif <input.mmdlog> [-o out.gif] [--fps N] [--width N] [--height N] [--no-collapse] [--hold-ms N] [--highlight] [--flash-ms N]
 ```
 
 `render` emits the **final** state only. `--format svg|png` rasterizes once and requires `-o`; `--format mmd` (default) writes text to `-o` or stdout.
@@ -505,6 +547,8 @@ mmdlog gif <input.mmdlog> [-o out.gif] [--fps N] [--width N] [--height N] [--no-
 | `--fps N` | gif | 2 |
 | `--no-collapse` | frames / gif | off — consecutive identical frames are collapsed by default |
 | `--hold-ms N` | gif | 0 — extends the last frame's display time |
+| `--highlight` | frames / gif | off — see [Highlighting deltas](#highlighting-deltas) |
+| `--flash-ms N` | gif | 150 — duration of the highlighted flash frame (with `--highlight`) |
 | `--json` | replay | off |
 
 `npm link` exposes a `mmdlog` binary: `mmdlog gif input.mmdlog -o out.gif`.
@@ -515,17 +559,17 @@ Static demo:
 ```bash
 npm run web
 ```
-Open `http://localhost:5173/examples/web/`. Pick an example, hit **Generate GIF**. A `<canvas>` plays the animation in sync with a syntax-highlighted Mermaid panel; the GIF blob is also downloadable.
+Open `http://localhost:5173/examples/web/`. Pick an example, hit **Generate GIF**. A `<canvas>` plays the animation in sync with a syntax-highlighted Mermaid panel; the GIF blob is also downloadable. The **highlight deltas** checkbox toggles the same green delta styling as the CLI `--highlight` flag (graph only).
 
 Embed as a library:
 ```js
 import mermaid from "mermaid";
-import { parseMerlog, replayTimeline } from "mmdlog/dist/core/index.js";
+import { parseMmdlog, replayTimeline } from "mmdlog/dist/core/index.js";
 import { encodeMermaidFramesToGif } from "mmdlog/dist/replay/browser.js";
 
 mermaid.initialize({ startOnLoad: false, htmlLabels: false });
 
-const { events } = parseMerlog(source, { strict: false });
+const { events } = parseMmdlog(source, { strict: false });
 const frames = replayTimeline(events);
 
 const bytes = await encodeMermaidFramesToGif(

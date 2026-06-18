@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseMerlog, replayTimeline, reduceEvents, emitMermaid, reducePrefixes } from "../dist/core/index.js";
+import { parseMmdlog, replayTimeline, reduceEvents, emitMermaid, reducePrefixes } from "../dist/core/index.js";
 
 function parse(src) {
   const full = src.startsWith("@diagram") ? src : `@diagram graph TD\n${src}`;
-  return parseMerlog(full, { strict: true });
+  return parseMmdlog(full, { strict: true });
 }
 
 function frames(src) {
@@ -54,4 +54,47 @@ test("recreate after delete produces correct state", () => {
   const fs = frames("+A\n+B\n-B\n+B[y2]");
   const last = fs[fs.length - 1].mermaid;
   assert.match(last, /B\["y2"\]/);
+});
+
+test("highlight + flash: delta step splits into flash frame then plain settle frame", () => {
+  const { events } = parse("+A\n+B");
+  const fs = replayTimeline(events, { highlight: true, flash: true });
+  // step 2 (+A): flash + settle, step 3 (+B): flash + settle
+  assert.equal(fs.length, 4);
+  assert.equal(fs[0].flash, true);
+  assert.match(fs[0].mermaid, /_mmdlog_new/);
+  assert.equal(fs[1].flash, undefined);
+  assert.doesNotMatch(fs[1].mermaid, /_mmdlog_new/);
+});
+
+test("highlight without flash: one highlighted frame per delta step", () => {
+  const { events } = parse("+A\n+B");
+  const fs = replayTimeline(events, { highlight: true });
+  assert.equal(fs.length, 2);
+  for (const f of fs) {
+    assert.equal(f.flash, undefined);
+    assert.match(f.mermaid, /_mmdlog_new/);
+  }
+});
+
+test("highlight + flash: removal step gets a red flash on the pre-removal state", () => {
+  const { events } = parse("+A\n+B\n+A --> B\n-B");
+  const fs = replayTimeline(events, { highlight: true, flash: true });
+  // step 5 (-B): red flash showing prev (A,B,A-->B) then settle (A only)
+  const flash = fs.find((f) => f.flash && f.mermaid.includes("_mmdlog_del"));
+  assert.ok(flash, "expected a red removal flash frame");
+  assert.match(flash.mermaid, /B\["B"\]/); // pre-removal: B still present
+  assert.match(flash.mermaid, /class B _mmdlog_del/); // B tinted red
+  assert.match(flash.mermaid, /linkStyle 0 stroke:#dc2626/); // removed edge tinted red
+  const last = fs[fs.length - 1];
+  assert.doesNotMatch(last.mermaid, /B\[/); // settle: B gone
+  assert.doesNotMatch(last.mermaid, /_mmdlog_del/);
+});
+
+test("highlight without flash: removal step shows plain post-removal state (no red)", () => {
+  const { events } = parse("+A\n+B\n+A --> B\n-B");
+  const fs = replayTimeline(events, { highlight: true });
+  const last = fs[fs.length - 1];
+  assert.doesNotMatch(last.mermaid, /_mmdlog_del/);
+  assert.doesNotMatch(last.mermaid, /B\[/);
 });

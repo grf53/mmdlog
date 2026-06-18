@@ -293,7 +293,7 @@ export interface AddRawEvent extends BaseEvent {
   content: string;
 }
 
-export type MerlogEvent =
+export type MmdlogEvent =
   | SetDiagramEvent
   | AddNodeEvent
   | AddEdgeEvent
@@ -358,10 +358,14 @@ export interface SequenceMessage {
   label: string;
 }
 
+export type SequenceItem =
+  | { type: "msg"; value: SequenceMessage }
+  | { type: "raw"; value: string };
+
 export interface SequenceState {
   participants: Map<string, NodeState>;
   messages: SequenceMessage[];
-  items: Array<{ type: "msg"; value: SequenceMessage } | { type: "raw"; value: string }>;
+  items: SequenceItem[];
 }
 
 export interface ClassRelation {
@@ -476,13 +480,21 @@ export interface ParseOptions {
 }
 
 export interface ParseResult {
-  events: MerlogEvent[];
+  events: MmdlogEvent[];
   warnings: string[];
 }
 
 export interface ReplayFrame {
   step: number;
-  event: MerlogEvent;
+  event: MmdlogEvent;
   state: CoreState;
   mermaid: string;
+  flash?: boolean;
+  /** CSS to inject into the rendered SVG (for diagrams without inline styling support, e.g., sequence). */
+  svgStyle?: string;
+}
+
+export interface HighlightedEmit {
+  mermaid: string;
+  svgStyle?: string;
 }
